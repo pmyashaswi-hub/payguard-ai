@@ -55,8 +55,13 @@ def render_profile():
         with col_info2:
             st.markdown(f"""
             <div style="margin-bottom: 14px;">
-                <div style="font-size: 11px; font-weight: 700; color: #6B7280; text-transform: uppercase;">Wallet Account Number</div>
-                <div style="font-size: 14px; font-weight: 600; color: #0B1D33; margin-top: 2px; font-family: 'JetBrains Mono', monospace;">{user.get('account_num')}</div>
+                <div style="font-size: 11px; font-weight: 700; color: #6B7280; text-transform: uppercase;">Linked Email / Firebase Google Auth</div>
+                <div style="font-size: 13px; font-weight: 600; color: #001D39; margin-top: 2px;">
+                    {user.get('email', 'N/A')}
+                    <span style="display: inline-block; background: #FFF4E5; color: #D97706; border: 1px solid #F59E0B; font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 999px; margin-left: 6px;">
+                        🔥 Firebase Verified
+                    </span>
+                </div>
             </div>
             <div style="margin-bottom: 14px;">
                 <div style="font-size: 11px; font-weight: 700; color: #6B7280; text-transform: uppercase;">Wallet Balance</div>
@@ -75,22 +80,37 @@ def render_profile():
         </div>
         """, unsafe_allow_html=True)
 
-        col_rst, col_out = st.columns([1, 1])
-        with col_rst:
-            init_bal = float(user.get("initial_balance", 50000.0))
-            if st.button(f"🔄 Reset Balance (₹{init_bal:,.0f})", use_container_width=True):
-                st.session_state.wallet_balances[user["user_id"]] = init_bal
-                try:
-                    from backend.app.database import db_manager
-                    conn = db_manager._get_sqlite_conn()
-                    conn.execute("UPDATE users SET available_balance = ? WHERE user_id = ?", (init_bal, user["user_id"]))
-                    conn.commit()
-                    conn.close()
-                except Exception:
-                    pass
-                st.success("Wallet balance reset.")
-                st.rerun()
+        col_topup, col_out = st.columns([1, 1])
+        with col_topup:
+            with st.expander("💳 Top Up Wallet Balance", expanded=False):
+                st.markdown("<div style='font-size: 13px; font-weight: 600; color: #0B1D33; margin-bottom: 8px;'>Add funds to your account:</div>", unsafe_allow_html=True)
+                
+                c_p1, c_p2, c_p3 = st.columns(3)
+                p_amt = 0.0
+                if c_p1.button("+₹1,000", key="p1k", use_container_width=True):
+                    p_amt = 1000.0
+                if c_p2.button("+₹5,000", key="p5k", use_container_width=True):
+                    p_amt = 5000.0
+                if c_p3.button("+₹10,000", key="p10k", use_container_width=True):
+                    p_amt = 10000.0
+
+                topup_custom = st.number_input(
+                    "Or custom top up amount (₹):",
+                    min_value=100.0,
+                    max_value=1000000.0,
+                    value=p_amt if p_amt > 0 else 5000.0,
+                    step=500.0,
+                    key="topup_custom_val"
+                )
+
+                if st.button("⚡ Add Money to Wallet", type="primary", use_container_width=True, key="btn_confirm_topup"):
+                    amount_to_add = p_amt if p_amt > 0 else topup_custom
+                    if amount_to_add > 0:
+                        new_balance = tx_service.top_up_balance(amount_to_add)
+                        st.success(f"✅ Successfully added ₹{amount_to_add:,.2f}! New Balance: ₹{new_balance:,.2f}")
+                        st.rerun()
 
         with col_out:
-            if st.button("🚪 Logout of Account", type="primary", use_container_width=True):
+            if st.button("🚪 Logout of Account", use_container_width=True):
                 AuthService.logout()
+

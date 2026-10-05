@@ -11,23 +11,27 @@ class RiskEngine:
         """
         risk_score = int(round(fraud_prob * 100))
         
-        # Decision Tiers
-        if risk_score < 25:
+        # Pure Behavioral Decision Tiers based on transaction telemetry & ML model
+        if risk_score <= 25:
             decision = "ALLOW"
-        elif risk_score < 65:
+        elif risk_score <= 65:
             decision = "VERIFY"
         else:
             decision = "REVIEW"
 
+        amount = float(data.get("amount", 0.0))
+        limit_exceeded = amount > 100000.0
+
         # Signal Generation
         signals: List[str] = []
-        amount = float(data.get("amount", 0.0))
         is_new_device = bool(data.get("is_new_device", False))
         is_new_location = bool(data.get("is_new_location", False))
         high_velocity = bool(data.get("high_velocity", False))
         failed_attempts = int(data.get("failed_attempts", 0))
 
-        if amount > 40000.0:
+        if amount > 100000.0:
+            signals.append("Transaction amount exceeds maximum limit of 1 Lakh (₹1,00,000)")
+        elif amount > 40000.0:
             signals.append("High transaction amount surge (> 5x normal profile)")
         elif amount > 10000.0:
             signals.append("Elevated single transaction amount")
@@ -78,6 +82,7 @@ class RiskEngine:
             "fraud_probability": round(fraud_prob, 4),
             "risk_score": risk_score,
             "decision": decision,
+            "limit_exceeded": limit_exceeded,
             "risk_signals": signals,
             "transaction_integrity": integrity_data
         }

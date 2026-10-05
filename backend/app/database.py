@@ -9,6 +9,10 @@ import sqlite3
 import datetime
 import hashlib
 from typing import List, Dict, Any, Optional
+from dotenv import load_dotenv
+
+# Load environment variables from .env
+load_dotenv()
 
 # Check for MySQL or MongoDB availability
 USE_MYSQL = False
@@ -67,6 +71,8 @@ class DatabaseManager:
             cursor.execute("ALTER TABLE users ADD COLUMN upi_id TEXT;")
         if "pin_hash" not in existing_cols:
             cursor.execute("ALTER TABLE users ADD COLUMN pin_hash TEXT;")
+        if "auth_provider" not in existing_cols:
+            cursor.execute("ALTER TABLE users ADD COLUMN auth_provider TEXT DEFAULT 'Standard';")
 
         # Beneficiaries Table
         cursor.execute("""
@@ -234,9 +240,10 @@ class DatabaseManager:
         mobile: str,
         email: str,
         pin: str,
+        password: str = None,
         initial_balance: float = 50000.0
     ) -> Dict[str, Any]:
-        """Registers a new banking user in persistent SQLite database."""
+        """Registers a new banking user in persistent SQLite database with password and 4-digit UPI PIN."""
         conn = self._get_sqlite_conn()
         cursor = conn.cursor()
 
@@ -248,19 +255,58 @@ class DatabaseManager:
         elif len(mobile_clean) == 13 and mobile_clean.startswith("+91"):
             mobile_clean = mobile_clean[3:]
 
-        # Validate duplicate email or mobile
-        cursor.execute("SELECT user_id, email, mobile FROM users WHERE LOWER(email) = ? OR mobile = ?", (email_clean, mobile_clean))
-        existing = cursor.fetchone()
-        if existing:
-            conn.close()
-            if existing["email"].lower() == email_clean:
-                return {"success": False, "error": f"An account with email '{email_clean}' already exists."}
-            else:
-                return {"success": False, "error": f"An account with mobile number '{mobile_clean}' already exists."}
-
         import random
-        user_id = f"usr_{random.randint(1000, 9999)}"
         pin_hash = self._hash_password(pin.strip())
+        password_hash = self._hash_password((password or pin).strip())
+
+        # Validate duplicate email or mobile (UPSERT if account exists)
+        cursor.execute("SELECT * FROM users WHERE LOWER(email) = ? OR mobile = ?", (email_clean, mobile_clean))
+        existing = cursor.fetchone()
+
+        if existing:
+            user_id = existing["user_id"]
+            acc_num = existing["account_number"] or f"ACC-{random.randint(1000,9999)}-{random.randint(1000,9999)}-{random.randint(1000,9999)}"
+            upi_slug = clean_name.lower().replace(" ", ".")
+            upi_id = existing["upi_id"] or f"{upi_slug}@payguard"
+            bal = float(existing["available_balance"]) if existing["available_balance"] is not None else float(initial_balance)
+            initials = "".join([p[0].upper() for p in clean_name.split()[:2]]) if clean_name else "PG"
+
+            cursor.execute("""
+            UPDATE users SET
+                name = ?,
+                mobile = ?,
+                email = ?,
+                pin_hash = ?,
+                password_hash = ?
+            WHERE user_id = ?
+            """, (clean_name, mobile_clean, email_clean, pin_hash, password_hash, user_id))
+
+            conn.commit()
+            conn.close()
+
+            user_data = {
+                "user_id": user_id,
+                "name": clean_name,
+                "mobile": mobile_clean,
+                "email": email_clean,
+                "pin": pin.strip(),
+                "account_num": acc_num,
+                "account_number": acc_num,
+                "upi_id": upi_id,
+                "initial_balance": bal,
+                "available_balance": bal,
+                "today_spending": float(existing["today_spending"] or 0.0),
+                "total_payments_count": int(existing["total_payments_count"] or 0),
+                "security_status": existing["security_status"] or "Protected",
+                "security_score": int(existing["security_score"] or 96),
+                "avatar_initials": initials
+            }
+            return {
+                "success": True,
+                "user": user_data
+            }
+
+        user_id = f"usr_{random.randint(1000, 9999)}"
         acc_num = f"ACC-{random.randint(1000,9999)}-{random.randint(1000,9999)}-{random.randint(1000,9999)}"
         upi_slug = clean_name.lower().replace(" ", ".")
         upi_id = f"{upi_slug}@payguard"
@@ -275,20 +321,9 @@ class DatabaseManager:
         )
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0.0, 0, 'Protected', 96, ?)
         """, (
-            user_id, clean_name, mobile_clean, email_clean, pin_hash, pin_hash,
+            user_id, clean_name, mobile_clean, email_clean, pin_hash, password_hash,
             acc_num, upi_id, float(initial_balance), now_iso
         ))
-
-        # Add default beneficiaries for new user
-        default_bens = [
-            (f"ben-{user_id}-1", user_id, "Rahul Kumar", "rahul@example.com", "rahul.k@upi", "XXXX-4819", "#3B82F6", "RK", 1, 1),
-            (f"ben-{user_id}-2", user_id, "Priya Sharma", "priya@example.com", "priya.s@upi", "XXXX-9201", "#EC4899", "PS", 1, 1),
-            (f"ben-{user_id}-3", user_id, "Arjun Mehta", "arjun@example.com", "arjun.m@upi", "XXXX-1104", "#10B981", "AM", 1, 1)
-        ]
-        cursor.executemany("""
-        INSERT INTO beneficiaries (id, user_id, name, email, upi_id, account_num, avatar_bg, initials, is_frequent, trusted)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, default_bens)
 
         conn.commit()
         conn.close()
@@ -336,21 +371,19 @@ class DatabaseManager:
         conn.close()
 
         if not row:
-            return {"success": False, "error": "No registered account found matching that mobile number or email."}
+            return {"success": False, "error": "No registered account found matching that Mail ID."}
 
         user_dict = dict(row)
         input_hash = self._hash_password(pin.strip())
 
         matched = False
-        if user_dict.get("pin_hash") and user_dict["pin_hash"] == input_hash:
+        if user_dict.get("password_hash") and user_dict["password_hash"] == input_hash:
             matched = True
-        elif user_dict.get("password_hash") and user_dict["password_hash"] == input_hash:
-            matched = True
-        elif pin.strip() in ["1234", "5678"] and user_dict.get("user_id") in ["usr_rahul", "usr_ananya"]:
+        elif user_dict.get("pin_hash") and user_dict["pin_hash"] == input_hash:
             matched = True
 
         if not matched:
-            return {"success": False, "error": "Incorrect security PIN. Please try again."}
+            return {"success": False, "error": "Incorrect password. Please verify your Mail ID and Password."}
 
         name = user_dict.get("name", "User")
         initials = "".join([p[0].upper() for p in name.split()[:2]]) if name else "PG"
@@ -374,9 +407,91 @@ class DatabaseManager:
                 "total_payments_count": int(user_dict.get("total_payments_count", 0)),
                 "security_status": user_dict.get("security_status", "Protected"),
                 "security_score": int(user_dict.get("security_score", 96)),
-                "avatar_initials": initials
+                "avatar_initials": initials,
+                "auth_provider": user_dict.get("auth_provider", "Standard")
             }
         }
+
+    def google_sso_authenticate(
+        self,
+        email: str,
+        name: Optional[str] = None,
+        mobile: Optional[str] = None,
+        pin: str = "1234"
+    ) -> Dict[str, Any]:
+        """
+        Authenticates or creates a user account linked with Google OAuth / Gmail.
+        Persists auth_provider = 'Google' and Gmail address into payguard_bank.db.
+        """
+        clean_email = (email or "").strip().lower()
+        if not clean_email or "@" not in clean_email:
+            return {"success": False, "error": "Invalid Gmail address provided."}
+
+        conn = self._get_sqlite_conn()
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM users WHERE LOWER(email) = ?", (clean_email,))
+        row = cursor.fetchone()
+
+        if row:
+            user_dict = dict(row)
+            cursor.execute("UPDATE users SET auth_provider = 'Google' WHERE user_id = ?", (user_dict["user_id"],))
+            conn.commit()
+            conn.close()
+
+            user_name = user_dict.get("name") or name or clean_email.split("@")[0].replace(".", " ").title()
+            initials = "".join([p[0].upper() for p in user_name.split()[:2]]) if user_name else "G"
+            acc_num = user_dict.get("account_number") or "ACC-8921-4409-7712"
+            upi = user_dict.get("upi_id") or f"{user_name.lower().replace(' ', '.')}@payguard"
+
+            return {
+                "success": True,
+                "user": {
+                    "user_id": user_dict["user_id"],
+                    "name": user_name,
+                    "mobile": user_dict.get("mobile", "9876543210"),
+                    "email": clean_email,
+                    "pin": pin,
+                    "account_num": acc_num,
+                    "account_number": acc_num,
+                    "upi_id": upi,
+                    "initial_balance": float(user_dict.get("available_balance", 50000.0)),
+                    "available_balance": float(user_dict.get("available_balance", 50000.0)),
+                    "today_spending": float(user_dict.get("today_spending", 0.0)),
+                    "total_payments_count": int(user_dict.get("total_payments_count", 0)),
+                    "security_status": "Protected (Google OAuth Verified)",
+                    "security_score": 98,
+                    "avatar_initials": initials,
+                    "auth_provider": "Google",
+                    "gmail_linked": True
+                }
+            }
+        else:
+            conn.close()
+            import random
+            display_name = (name or clean_email.split("@")[0].replace(".", " ").title()).strip()
+            mob_val = (mobile or f"98{random.randint(10000000, 99999999)}").strip()
+
+            reg_res = self.register_user(
+                name=display_name,
+                mobile=mob_val,
+                email=clean_email,
+                pin=pin,
+                initial_balance=50000.0
+            )
+
+            if reg_res.get("success") and "user" in reg_res:
+                u_obj = reg_res["user"]
+                conn2 = self._get_sqlite_conn()
+                conn2.execute("UPDATE users SET auth_provider = 'Google' WHERE user_id = ?", (u_obj["user_id"],))
+                conn2.commit()
+                conn2.close()
+
+                u_obj["auth_provider"] = "Google"
+                u_obj["gmail_linked"] = True
+                u_obj["security_status"] = "Protected (Google OAuth Verified)"
+                return {"success": True, "user": u_obj}
+
+            return reg_res
 
     def get_user_profile(self, user_id: str) -> Optional[Dict[str, Any]]:
         """Retrieves profile metrics for user."""
@@ -393,6 +508,20 @@ class DatabaseManager:
             return d
         return None
 
+    def verify_upi_pin(self, user_id: str, entered_pin: str) -> bool:
+        """Verifies entered UPI PIN against stored pin_hash in persistent database."""
+        if not user_id or not entered_pin:
+            return False
+        conn = self._get_sqlite_conn()
+        cursor = conn.cursor()
+        cursor.execute("SELECT pin_hash FROM users WHERE user_id = ?", (user_id,))
+        row = cursor.fetchone()
+        conn.close()
+        if not row or not row["pin_hash"]:
+            return False
+        entered_hash = self._hash_password(entered_pin.strip())
+        return row["pin_hash"] == entered_hash
+
     def update_user_balance(self, user_id: str, amount_deducted: float):
         """Updates available balance and spending in database."""
         conn = self._get_sqlite_conn()
@@ -406,6 +535,23 @@ class DatabaseManager:
         """, (amount_deducted, amount_deducted, user_id))
         conn.commit()
         conn.close()
+
+    def top_up_user_balance(self, user_id: str, amount_added: float) -> float:
+        """Adds top up amount to available balance in database and returns new balance."""
+        conn = self._get_sqlite_conn()
+        cursor = conn.cursor()
+        cursor.execute("""
+        UPDATE users 
+        SET available_balance = available_balance + ?
+        WHERE user_id = ?
+        """, (amount_added, user_id))
+        conn.commit()
+
+        cursor.execute("SELECT available_balance FROM users WHERE user_id = ?", (user_id,))
+        row = cursor.fetchone()
+        conn.close()
+        return float(row["available_balance"]) if row else 0.0
+
 
     # =========================================================================
     # BENEFICIARIES CRUD
@@ -451,6 +597,70 @@ class DatabaseManager:
             "is_frequent": 0,
             "trusted": 1
         }
+
+    def add_or_update_beneficiary(self, user_id: str, name: str, identifier: str) -> Dict[str, Any]:
+        """
+        Adds a payee to beneficiaries or marks existing payee as frequent (is_frequent = 1) in SQLite database.
+        """
+        conn = self._get_sqlite_conn()
+        cursor = conn.cursor()
+
+        clean_name = (name or identifier).strip()
+        clean_id = (identifier or "").strip()
+
+        # Check if payee already exists for this user by upi_id, email, or name
+        cursor.execute("""
+            SELECT * FROM beneficiaries 
+            WHERE user_id = ? AND (LOWER(name) = ? OR LOWER(upi_id) = ? OR LOWER(email) = ?)
+        """, (user_id, clean_name.lower(), clean_id.lower(), clean_id.lower()))
+        existing = cursor.fetchone()
+
+        if existing:
+            cursor.execute("""
+                UPDATE beneficiaries 
+                SET is_frequent = 1 
+                WHERE id = ?
+            """, (existing["id"],))
+            conn.commit()
+            conn.close()
+            return dict(existing)
+        else:
+            import random
+            ben_id = f"ben-{user_id}-{random.randint(1000, 9999)}"
+            parts = clean_name.split()
+            if len(parts) >= 2:
+                initials = f"{parts[0][0]}{parts[1][0]}".upper()
+            elif len(clean_name) >= 2:
+                initials = clean_name[:2].upper()
+            else:
+                initials = "PY"
+
+            colors = ["#3B82F6", "#EC4899", "#10B981", "#8B5CF6", "#06B6D4", "#F59E0B"]
+            avatar_bg = random.choice(colors)
+            acc_num = f"XXXX-{random.randint(1000, 9999)}"
+            email_val = clean_id if "@" in clean_id and "." in clean_id else f"{clean_id.replace(' ', '.')}@example.com"
+            upi_val = clean_id if "@" in clean_id else f"{clean_id}@upi"
+
+            cursor.execute("""
+            INSERT INTO beneficiaries (id, user_id, name, email, upi_id, account_num, avatar_bg, initials, is_frequent, trusted)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, 1)
+            """, (ben_id, user_id, clean_name, email_val, upi_val, acc_num, avatar_bg, initials))
+
+            conn.commit()
+            conn.close()
+
+            return {
+                "id": ben_id,
+                "user_id": user_id,
+                "name": clean_name,
+                "email": email_val,
+                "upi_id": upi_val,
+                "account_num": acc_num,
+                "avatar_bg": avatar_bg,
+                "initials": initials,
+                "is_frequent": 1,
+                "trusted": 1
+            }
 
     # =========================================================================
     # TRANSACTIONS CRUD

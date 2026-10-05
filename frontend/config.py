@@ -4,6 +4,10 @@ Provides central configuration settings and backend API base URL with environmen
 """
 
 import os
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Backend API Endpoint Base URL (Default: http://127.0.0.1:8000)
 BACKEND_URL = os.getenv("BACKEND_URL", "http://127.0.0.1:8000")

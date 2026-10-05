@@ -66,7 +66,8 @@ def render_navigation() -> str:
             ("send_money", "💸 Send Money"),
             ("transactions", "📋 Transaction History"),
             ("security_center", "🛡 Security Center"),
-            ("profile", "👤 Profile")
+            ("profile", "👤 Profile"),
+            ("db_inspector", "🗄️ Database Inspector")
         ]
 
         st.markdown('<div style="font-size: 11px; font-weight: 700; color: #6B7280; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px;">Navigation</div>', unsafe_allow_html=True)

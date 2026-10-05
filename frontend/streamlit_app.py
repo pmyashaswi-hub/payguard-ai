@@ -37,6 +37,7 @@ from frontend.components.payment import render_payment_flow
 from frontend.components.transactions import render_transaction_history
 from frontend.components.security import render_security_center
 from frontend.components.profile import render_profile
+from frontend.components.db_viewer import render_db_inspector
 
 def main():
     # Authentication Check
@@ -64,6 +65,8 @@ def main():
         render_security_center()
     elif active_screen == "profile":
         render_profile()
+    elif active_screen == "db_inspector":
+        render_db_inspector()
     else:
         render_home()
 

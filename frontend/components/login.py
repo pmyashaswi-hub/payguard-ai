@@ -1,43 +1,42 @@
 """
-PayGuard AI - Authentication Screen Component (Sign In & Registration).
-Provides secure dual-mode sign-in and user registration with database persistence.
+PayGuard AI - Authentication Screen Component (Log In & Create Account).
+Features Email + Confirmation Code + Password + Confirm Password + UPI PIN workflow.
+Optimized for 100% desktop site viewports with zero vertical scrolling required.
 """
 
 import os
 import re
 import streamlit as st
 from frontend.services.auth_service import AuthService
+from frontend.services.clerk_service import ClerkAuthService
 from frontend.data.mock_data import DEMO_USERS
 
 def render_login():
-    """Renders the client-facing Login and Registration screen."""
-    # Ensure auth_mode default
+    """Renders the streamlined Log In and Create Account screen fitted for 100% desktop viewports."""
     if "auth_mode" not in st.session_state:
         st.session_state.auth_mode = "login"
 
-    # Navigation link back to project overview
-    col_back, _ = st.columns([1, 2])
-    with col_back:
+    # Compact Header Bar (Back button + Logo inline)
+    col_nav_left, col_nav_right = st.columns([1, 2])
+    with col_nav_left:
         if st.button("← Back to Project Overview", key="btn_back_to_intro", use_container_width=False):
             st.session_state.intro_viewed = False
             st.rerun()
 
-    st.markdown("""
-    <div style="text-align: center; margin-bottom: 24px;">
-        <div style="display: inline-flex; align-items: center; gap: 8px; margin-bottom: 6px;">
-            <span style="font-size: 24px;">🛡️</span>
-            <span style="font-size: 24px; font-weight: 800; color: #0B1D33; letter-spacing: -0.03em;">PayGuard</span>
+    with col_nav_right:
+        st.markdown("""
+        <div style="text-align: right; padding-right: 4px;">
+            <span style="font-size: 18px; font-weight: 800; color: #001D39; letter-spacing: -0.02em;">🛡️ PayGuard</span>
+            <span style="font-size: 11px; color: #49769F; font-weight: 600; margin-left: 8px;">• Intelligent Protection</span>
         </div>
-        <div style="font-size: 13px; color: #475569; font-weight: 600;">
-            Secure payments &bull; Intelligent protection &bull; Instant Ledger
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+        """, unsafe_allow_html=True)
 
-    # Main Card Container with Split Grid
+    st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
+
+    # Main Card Container with Compact Split Grid
     auth_card = st.container(border=True)
     with auth_card:
-        col_img, col_form = st.columns([1.05, 1.25], gap="large")
+        col_img, col_form = st.columns([1.0, 1.3], gap="large")
 
         # LEFT COLUMN: Visual Brand Illustration & Features
         with col_img:
@@ -50,32 +49,31 @@ def render_login():
                 st.image(img_path, use_container_width=True)
 
             st.markdown("""
-            <div style="background: #F7F8FA; border: 1px solid #EDEFF3; border-radius: 12px; padding: 14px 16px; margin-top: 14px;">
-                <div style="font-size: 13px; font-weight: 700; color: #0B1D33; margin-bottom: 6px;">
-                    🔒 Military-Grade Payment Security
+            <div style="background: #F0F6FA; border: 1px solid #BDD8E9; border-radius: 10px; padding: 10px 14px; margin-top: 8px;">
+                <div style="font-size: 12px; font-weight: 700; color: #001D39; margin-bottom: 3px;">
+                    🔒 Military-Grade Payment Protection
                 </div>
-                <div style="font-size: 11px; color: #6B7280; line-height: 1.5;">
-                    Every transaction is protected by 256-bit encryption and evaluated against real-time behavioral models in &lt; 50ms.
+                <div style="font-size: 11px; color: #49769F; line-height: 1.4;">
+                    Protected by 256-bit encryption & evaluated against real-time PyTorch ResNeXt-GRU models in &lt; 50ms.
                 </div>
-                <div style="display: flex; gap: 8px; margin-top: 10px; font-size: 11px; font-weight: 600; color: #2F5FDE;">
+                <div style="display: flex; gap: 8px; margin-top: 6px; font-size: 10.5px; font-weight: 700; color: #0A4174;">
                     <span>✓ ResNeXt-GRU</span>
                     <span>&bull;</span>
                     <span>✓ Double-Entry Check</span>
                     <span>&bull;</span>
-                    <span>✓ Zero Paperwork</span>
+                    <span>✓ Email Verified</span>
                 </div>
             </div>
             """, unsafe_allow_html=True)
 
-        # RIGHT COLUMN: Dual Tab Auth Form (Sign In / Register)
+        # RIGHT COLUMN: Dual Tab Auth Form (Log In / Create Account)
         with col_form:
-            # Segmented Switcher Header
             c_tab_login, c_tab_reg = st.columns(2)
             is_login_mode = st.session_state.auth_mode == "login"
 
             with c_tab_login:
                 if st.button(
-                    "🔑 Sign In",
+                    "🔑 Log In",
                     type="primary" if is_login_mode else "secondary",
                     use_container_width=True,
                     key="tab_btn_login"
@@ -97,35 +95,35 @@ def render_login():
                     st.session_state.reg_error = None
                     st.rerun()
 
-            st.markdown("<div style='height: 12px;'></div>", unsafe_allow_html=True)
+            st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
 
             # =========================================================================
-            # A. SIGN IN MODE
+            # A. LOG IN MODE
             # =========================================================================
             if is_login_mode:
                 st.markdown("""
-                <div style="margin-bottom: 14px;">
-                    <h2 style="font-size: 20px; font-weight: 700; color: #0B1D33; margin: 0 0 2px 0;">Sign In</h2>
-                    <div style="font-size: 12px; color: #6B7280;">Enter your registered mobile number or email and 4-digit PIN to access your account.</div>
+                <div style="margin-bottom: 8px;">
+                    <h2 style="font-size: 18px; font-weight: 800; color: #001D39; margin: 0 0 2px 0;">Log In</h2>
+                    <div style="font-size: 11.5px; color: #49769F;">Enter your registered Mail ID and Password to sign in to your account.</div>
                 </div>
                 """, unsafe_allow_html=True)
 
-                default_login_id = st.session_state.get("prefill_mobile", "9876543210")
-                default_pin = st.session_state.get("prefill_pin", "1234")
+                default_login_id = st.session_state.get("prefill_email", "")
+                default_password = st.session_state.get("prefill_password", "")
 
                 login_identifier = st.text_input(
-                    "Mobile Number or Registered Email",
+                    "Mail ID",
                     value=default_login_id,
-                    placeholder="e.g. 9876543210 or user@example.com",
+                    placeholder="e.g. user@example.com",
                     key="input_login_id"
                 )
 
-                login_pin = st.text_input(
-                    "Security PIN",
-                    value=default_pin,
+                login_password = st.text_input(
+                    "Password",
+                    value=default_password,
                     type="password",
-                    max_chars=6,
-                    placeholder="Enter 4-digit PIN",
+                    max_chars=32,
+                    placeholder="Enter Password",
                     key="input_login_pin"
                 )
 
@@ -134,29 +132,20 @@ def render_login():
                     st.checkbox("Remember me", value=True, key="chk_remember")
                 with col_forgot:
                     st.markdown(
-                        '<div style="text-align: right; font-size: 12px; color: #2F5FDE; cursor: pointer; padding-top: 4px;" title="PIN resets require verification in sandbox">Forgot PIN?</div>',
+                        '<div style="text-align: right; font-size: 11px; color: #0A4174; cursor: pointer; padding-top: 2px;" title="Password resets require verification in sandbox">Forgot Password?</div>',
                         unsafe_allow_html=True
                     )
 
                 # Error State Display
                 if "login_error" in st.session_state and st.session_state.login_error:
                     st.markdown(f"""
-                    <div style="background: #FDECEA; border: 1px solid #C0392B; color: #C0392B; border-radius: 8px; padding: 10px 14px; font-size: 12px; font-weight: 600; margin-bottom: 12px;">
+                    <div style="background: #FDECEA; border: 1px solid #C0392B; color: #C0392B; border-radius: 8px; padding: 6px 10px; font-size: 11px; font-weight: 600; margin-bottom: 8px;">
                         ⚠️ {st.session_state.login_error}
                     </div>
                     """, unsafe_allow_html=True)
 
-                # Success notification (e.g. if redirected from registration)
-                if "login_success_msg" in st.session_state and st.session_state.login_success_msg:
-                    st.markdown(f"""
-                    <div style="background: #E7F8F0; border: 1px solid #1E9E6B; color: #1E9E6B; border-radius: 8px; padding: 10px 14px; font-size: 12px; font-weight: 600; margin-bottom: 12px;">
-                        ✓ {st.session_state.login_success_msg}
-                    </div>
-                    """, unsafe_allow_html=True)
-                    st.session_state.login_success_msg = None
-
-                if st.button("Sign In to Account →", type="primary", use_container_width=True, key="btn_submit_signin"):
-                    success, err_msg = AuthService.login(login_identifier, login_pin)
+                if st.button("Log In to Account →", type="primary", use_container_width=True, key="btn_submit_signin"):
+                    success, err_msg = AuthService.login(login_identifier, login_password)
                     if success:
                         st.session_state.login_error = None
                         st.rerun()
@@ -164,174 +153,257 @@ def render_login():
                         st.session_state.login_error = err_msg
                         st.rerun()
 
-                # Toggle to Register
-                st.markdown("""
-                <div style="text-align: center; margin: 12px 0 16px 0; font-size: 12px; color: #6B7280;">
-                    New to PayGuard?
-                </div>
-                """, unsafe_allow_html=True)
-
-                if st.button("✨ Don't have an account? Register Now", use_container_width=True, key="btn_goto_register"):
-                    st.session_state.auth_mode = "register"
-                    st.session_state.login_error = None
-                    st.session_state.reg_error = None
-                    st.rerun()
-
-                st.markdown("<div style='margin: 16px 0; border-top: 1px solid #EDEFF3;'></div>", unsafe_allow_html=True)
-
-                # Demo Accounts Fast Sign-In for Reviewers
-                st.markdown('<div style="font-size: 11px; font-weight: 700; color: #6B7280; text-transform: uppercase; margin-bottom: 8px;">Demo Fast Access (Reviewers):</div>', unsafe_allow_html=True)
-                col_d1, col_d2 = st.columns(2)
-                with col_d1:
-                    if st.button("Rahul Kumar (9876543210)", use_container_width=True, key="demo_btn_rahul"):
-                        st.session_state.prefill_mobile = "9876543210"
-                        st.session_state.prefill_pin = "1234"
-                        AuthService.login("9876543210", "1234")
-                        st.rerun()
-                with col_d2:
-                    if st.button("Ananya Sharma (9123456780)", use_container_width=True, key="demo_btn_ananya"):
-                        st.session_state.prefill_mobile = "9123456780"
-                        st.session_state.prefill_pin = "5678"
-                        AuthService.login("9123456780", "5678")
-                        st.rerun()
-
             # =========================================================================
-            # B. REGISTRATION MODE
+            # B. CREATE ACCOUNT MODE (Multi-Step Page Transition: Step 1 -> Step 2)
             # =========================================================================
             else:
-                st.markdown("""
-                <div style="margin-bottom: 14px;">
-                    <h2 style="font-size: 20px; font-weight: 700; color: #0B1D33; margin: 0 0 2px 0;">Create Account</h2>
-                    <div style="font-size: 12px; color: #6B7280;">Fill in your details to open your AI-protected digital banking wallet.</div>
-                </div>
-                """, unsafe_allow_html=True)
+                reg_step = st.session_state.get("reg_step", 1)
+                is_verified = st.session_state.get("email_verified", False) and st.session_state.get("verified_email") is not None
 
-                reg_name = st.text_input(
-                    "Full Name",
-                    placeholder="e.g. Priya Sharma",
-                    key="reg_name_input"
-                )
+                # ---------------------------------------------------------------------
+                # STEP 2 (NEXT PAGE): PASSWORD & 4-DIGIT UPI PIN SETUP
+                # ---------------------------------------------------------------------
+                if reg_step == 2 and is_verified:
+                    verified_m = st.session_state.get("verified_email", "")
+                    verified_n = st.session_state.get("verified_name", "User")
+                    verified_mob = st.session_state.get("verified_mobile", "")
 
-                c_reg_m, c_reg_e = st.columns([1, 1])
-                with c_reg_m:
-                    reg_mobile = st.text_input(
-                        "Mobile Number (10 Digits)",
-                        placeholder="e.g. 9876501234",
-                        max_chars=10,
-                        key="reg_mobile_input"
-                    )
-                with c_reg_e:
-                    reg_email = st.text_input(
-                        "Email Address",
-                        placeholder="e.g. priya@example.com",
-                        key="reg_email_input"
-                    )
-
-                c_pin1, c_pin2 = st.columns(2)
-                with c_pin1:
-                    reg_pin = st.text_input(
-                        "4-Digit Security PIN",
-                        type="password",
-                        max_chars=4,
-                        placeholder="••••",
-                        key="reg_pin_input"
-                    )
-                with c_pin2:
-                    reg_pin_confirm = st.text_input(
-                        "Confirm Security PIN",
-                        type="password",
-                        max_chars=4,
-                        placeholder="••••",
-                        key="reg_pin_confirm_input"
-                    )
-
-                reg_balance = st.number_input(
-                    "Initial Wallet Balance Deposit (₹)",
-                    min_value=1000.0,
-                    max_value=500000.0,
-                    value=50000.0,
-                    step=5000.0,
-                    format="%.2f",
-                    key="reg_balance_input"
-                )
-
-                # Dynamic Preview Box for User Info
-                computed_upi = f"{reg_name.strip().lower().replace(' ', '.')}@payguard" if reg_name.strip() else "yourname@payguard"
-                st.markdown(f"""
-                <div style="background: #EEF3FF; border: 1px solid #D0E1FD; border-radius: 8px; padding: 10px 14px; margin: 10px 0 14px 0; font-size: 11px;">
-                    <div style="font-weight: 700; color: #2F5FDE; margin-bottom: 2px;">⚡ Live Account Setup Preview:</div>
-                    <div style="color: #475569;">
-                        &bull; Virtual UPI Address: <code style="color: #2F5FDE; font-weight: 600;">{computed_upi}</code><br>
-                        &bull; Initial Wallet Balance: <strong>₹{reg_balance:,.2f}</strong><br>
-                        &bull; Data Persistence: Stored securely in <strong>payguard_bank.db</strong>
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
-
-                # Registration Error Display
-                if "reg_error" in st.session_state and st.session_state.reg_error:
                     st.markdown(f"""
-                    <div style="background: #FDECEA; border: 1px solid #C0392B; color: #C0392B; border-radius: 8px; padding: 10px 14px; font-size: 12px; font-weight: 600; margin-bottom: 12px;">
-                        ⚠️ {st.session_state.reg_error}
+                    <div style="margin-bottom: 8px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <h2 style="font-size: 18px; font-weight: 800; color: #001D39; margin: 0;">Step 2: Security Setup</h2>
+                            <span style="background: #10B981; color: #FFFFFF; font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 999px;">
+                                ✅ Mail ID Verified
+                            </span>
+                        </div>
+                        <div style="font-size: 11.5px; color: #49769F; margin-top: 2px;">Set your login Password and 4-Digit UPI PIN for transactions.</div>
+                    </div>
+                    <div style="background: #F4F0FF; border: 1px solid #6C47FF; color: #3C1E99; border-radius: 8px; padding: 8px 12px; font-size: 11.5px; font-weight: 700; margin-bottom: 12px;">
+                        👤 <b>{verified_n}</b> &bull; 📱 <b>+91 {verified_mob}</b> &bull; ✉️ <u>{verified_m}</u>
                     </div>
                     """, unsafe_allow_html=True)
 
-                if st.button("Complete Registration & Open Account →", type="primary", use_container_width=True, key="btn_submit_register"):
-                    # Form validation
-                    if not reg_name.strip():
-                        st.session_state.reg_error = "Please enter your full name."
-                        st.rerun()
-                    elif not reg_mobile.strip().isdigit() or len(reg_mobile.strip()) != 10:
-                        st.session_state.reg_error = "Mobile number must be exactly 10 digits."
-                        st.rerun()
-                    elif "@" not in reg_email or "." not in reg_email:
-                        st.session_state.reg_error = "Please enter a valid email address."
-                        st.rerun()
-                    elif not reg_pin.strip().isdigit() or len(reg_pin.strip()) != 4:
-                        st.session_state.reg_error = "Security PIN must be exactly 4 digits."
-                        st.rerun()
-                    elif reg_pin.strip() != reg_pin_confirm.strip():
-                        st.session_state.reg_error = "Security PIN and Confirmation PIN do not match."
-                        st.rerun()
-                    else:
-                        success, err_msg, new_user = AuthService.register(
-                            name=reg_name.strip(),
-                            mobile=reg_mobile.strip(),
-                            email=reg_email.strip(),
-                            pin=reg_pin.strip(),
-                            initial_balance=float(reg_balance)
+                    c_p1, c_p2 = st.columns(2)
+                    with c_p1:
+                        reg_pass = st.text_input(
+                            "Password (Min 8 Chars, Letter + Number)",
+                            type="password",
+                            placeholder="Enter password",
+                            key="reg_pass_input"
+                        )
+                    with c_p2:
+                        reg_pass_confirm = st.text_input(
+                            "Confirm Password",
+                            type="password",
+                            placeholder="Re-enter password",
+                            key="reg_pass_confirm_input"
                         )
 
-                        if success and new_user:
-                            # Automatically authenticate the new user into their freshly minted account
-                            st.session_state.authenticated_user = new_user
-                            if "wallet_balances" not in st.session_state:
-                                st.session_state.wallet_balances = {}
-                            st.session_state.wallet_balances[new_user["user_id"]] = float(new_user["available_balance"])
-                            st.session_state.current_screen = "home"
-                            st.session_state.login_error = None
-                            st.session_state.reg_error = None
+                    reg_pin = st.text_input(
+                        "Set 4-Digit UPI PIN (For Money Transfers)",
+                        type="password",
+                        max_chars=4,
+                        placeholder="e.g. 1234",
+                        key="reg_pin_input"
+                    )
+
+                    # Registration Error Display
+                    if "reg_error" in st.session_state and st.session_state.reg_error:
+                        st.markdown(f"""
+                        <div style="background: #FDECEA; border: 1px solid #C0392B; color: #C0392B; border-radius: 8px; padding: 6px 10px; font-size: 11px; font-weight: 600; margin-bottom: 8px;">
+                            ⚠️ {st.session_state.reg_error}
+                        </div>
+                        """, unsafe_allow_html=True)
+
+                    c_b1, c_b2 = st.columns([1, 2])
+                    with c_b1:
+                        if st.button("← Back", use_container_width=True, key="btn_reg_back_step1"):
+                            st.session_state.reg_step = 1
                             st.rerun()
-                        else:
-                            st.session_state.reg_error = err_msg
-                            st.rerun()
 
-                # Toggle back to Sign In
-                st.markdown("""
-                <div style="text-align: center; margin: 12px 0 6px 0; font-size: 12px; color: #6B7280;">
-                    Already have an account?
-                </div>
-                """, unsafe_allow_html=True)
+                    with c_b2:
+                        if st.button("🚀 Complete Account & Log In →", type="primary", use_container_width=True, key="btn_submit_register"):
+                            clean_p = reg_pass.strip()
+                            clean_p2 = reg_pass_confirm.strip()
+                            clean_pin = reg_pin.strip()
 
-                if st.button("← Already Registered? Sign In Here", use_container_width=True, key="btn_goto_login"):
-                    st.session_state.auth_mode = "login"
-                    st.session_state.login_error = None
-                    st.session_state.reg_error = None
-                    st.rerun()
+                            if len(clean_p) < 8 or not any(c.isalpha() for c in clean_p) or not any(c.isdigit() or not c.isalnum() for c in clean_p):
+                                st.session_state.reg_error = "Password must be at least 8 characters long with at least 1 letter and 1 number/special character."
+                                st.rerun()
+                            elif clean_p != clean_p2:
+                                st.session_state.reg_error = "Password and Confirm Password do not match."
+                                st.rerun()
+                            elif not clean_pin.isdigit() or len(clean_pin) != 4:
+                                st.session_state.reg_error = "UPI PIN must be exactly 4 digits."
+                                st.rerun()
+                            else:
+                                success, err_msg, new_user = AuthService.register(
+                                    name=verified_n,
+                                    mobile=verified_mob,
+                                    email=verified_m,
+                                    pin=clean_pin,
+                                    password=clean_p,
+                                    initial_balance=50000.0
+                                )
 
-    # Small, unobtrusive sandbox footer
+                                if success and new_user:
+                                    st.session_state.authenticated_user = new_user
+                                    if "wallet_balances" not in st.session_state:
+                                        st.session_state.wallet_balances = {}
+                                    st.session_state.wallet_balances[new_user["user_id"]] = float(new_user["available_balance"])
+                                    st.session_state.current_screen = "home"
+                                    st.session_state.login_error = None
+                                    st.session_state.reg_error = None
+                                    st.session_state.code_sent_msg = None
+                                    st.session_state.code_sent_info = None
+                                    st.session_state.email_verified = False
+                                    st.session_state.verified_email = None
+                                    st.session_state.reg_step = 1
+                                    st.rerun()
+                                else:
+                                    st.session_state.reg_error = err_msg
+                                    st.rerun()
+
+                # ---------------------------------------------------------------------
+                # STEP 1 (FIRST PAGE): FULL NAME, MOBILE, MAIL ID & CLERK VERIFICATION
+                # ---------------------------------------------------------------------
+                else:
+                    st.markdown("""
+                    <div style="margin-bottom: 6px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <h2 style="font-size: 18px; font-weight: 800; color: #001D39; margin: 0;">Create Account</h2>
+                            <span style="background: #6C47FF; color: #FFFFFF; font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 999px;">
+                                🔒 Clerk Auth Engine (clerk.com)
+                            </span>
+                        </div>
+                        <div style="font-size: 11.5px; color: #49769F; margin-top: 2px;">Step 1: Enter details & verify Mail ID &bull; Step 2: Set Password on next page.</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+
+                    c_n1, c_n2 = st.columns(2)
+                    with c_n1:
+                        reg_name_pre = st.text_input(
+                            "Full Name",
+                            value=st.session_state.get("verified_name", ""),
+                            placeholder="e.g. Rahul Kumar",
+                            key="reg_name_input"
+                        )
+                    with c_n2:
+                        reg_mobile_pre = st.text_input(
+                            "Mobile Number (10 Digits)",
+                            value=st.session_state.get("verified_mobile", ""),
+                            placeholder="e.g. 9876543210",
+                            max_chars=13,
+                            key="reg_mobile_input"
+                        )
+
+                    c_m1, c_m2 = st.columns([1.5, 1])
+                    with c_m1:
+                        reg_email = st.text_input(
+                            "Mail ID",
+                            value=st.session_state.get("verified_email", ""),
+                            placeholder="e.g. user@example.com",
+                            key="reg_email_input"
+                        )
+                    with c_m2:
+                        st.markdown("<div style='height: 24px;'></div>", unsafe_allow_html=True)
+                        if st.button("✉️ Send Clerk Code", use_container_width=True, key="btn_send_email_code"):
+                            ok_code, msg_code, gen_code = ClerkAuthService.send_email_code(reg_email)
+                            st.session_state.email_verified = False
+                            st.session_state.verified_email = None
+                            if ok_code:
+                                st.session_state.code_sent_msg = msg_code
+                                st.session_state.reg_error = None
+                                st.rerun()
+                            else:
+                                st.session_state.reg_error = msg_code
+                                st.rerun()
+
+                    # Display Confirmation Code Sent Notification
+                    clerk_info = st.session_state.get("clerk_sent_info")
+                    info = st.session_state.get("code_sent_info")
+                    target_info = clerk_info or info
+
+                    if target_info and target_info.get("email"):
+                        st.markdown(f"""
+                        <div style="background: #F4F0FF; border: 1px solid #B89CFF; color: #3C1E99; border-radius: 8px; padding: 10px 14px; margin-bottom: 10px;">
+                            <div style="font-size: 12.5px; font-weight: 700; color: #1E0A52; margin-bottom: 4px;">
+                                📬 Verification Code Sent to <u>{target_info['email']}</u>
+                            </div>
+                            <div style="font-size: 11px; color: #5B38D8; line-height: 1.4;">
+                                Please check your email inbox at <b>{target_info['email']}</b>, copy the 6-digit verification code sent to your Mail ID, and enter it below.
+                            </div>
+                        </div>
+                        """, unsafe_allow_html=True)
+                    elif st.session_state.get("code_sent_msg"):
+                        st.markdown(f"""
+                        <div style="background: #F4F0FF; border: 1px solid #B89CFF; color: #3C1E99; border-radius: 8px; padding: 8px 12px; font-size: 11px; font-weight: 600; margin-bottom: 8px;">
+                            📬 Verification code sent to your Mail ID! Please check your email inbox.
+                        </div>
+                        """, unsafe_allow_html=True)
+
+                    # CODE ENTRY + VERIFY BUTTON VIA CLERK -> ADVANCES TO STEP 2 (NEXT PAGE)
+                    c_vc1, c_vc2 = st.columns([1.5, 1])
+                    with c_vc1:
+                        reg_code = st.text_input(
+                            "6-Digit Verification Code",
+                            placeholder="Enter 6-digit code received on your Mail ID",
+                            max_chars=6,
+                            key="reg_code_input"
+                        )
+                    with c_vc2:
+                        st.markdown("<div style='height: 24px;'></div>", unsafe_allow_html=True)
+                        if st.button("✅ Verify & Continue →", use_container_width=True, key="btn_verify_code_now"):
+                            clean_name = reg_name_pre.strip()
+                            clean_mob = reg_mobile_pre.strip().replace(" ", "").replace("-", "")
+                            if len(clean_mob) == 12 and clean_mob.startswith("91"):
+                                clean_mob = clean_mob[2:]
+                            elif len(clean_mob) == 13 and clean_mob.startswith("+91"):
+                                clean_mob = clean_mob[3:]
+
+                            clean_m = reg_email.strip().lower()
+                            clean_c = reg_code.strip()
+
+                            if not clean_name or len(clean_name) < 2:
+                                st.session_state.reg_error = "Please enter your Full Name (at least 2 characters)."
+                                st.rerun()
+                            elif not clean_mob.isdigit() or len(clean_mob) != 10:
+                                st.session_state.reg_error = "Please enter a valid 10-digit Mobile Number."
+                                st.rerun()
+                            elif not clean_m or "@" not in clean_m:
+                                st.session_state.reg_error = "Please enter your valid Mail ID first."
+                                st.session_state.email_verified = False
+                                st.rerun()
+                            elif not clean_c:
+                                st.session_state.reg_error = "Please enter the 6-digit Clerk verification code sent to your Mail ID."
+                                st.session_state.email_verified = False
+                                st.rerun()
+                            else:
+                                ok_clerk, msg_clerk = ClerkAuthService.verify_email_code(clean_m, clean_c)
+                                if ok_clerk or AuthService.verify_email_confirmation_code(clean_m, clean_c):
+                                    st.session_state.email_verified = True
+                                    st.session_state.verified_email = clean_m
+                                    st.session_state.verified_name = clean_name
+                                    st.session_state.verified_mobile = clean_mob
+                                    st.session_state.reg_step = 2  # MOVE TO NEXT PAGE!
+                                    st.session_state.reg_error = None
+                                    st.rerun()
+                                else:
+                                    st.session_state.email_verified = False
+                                    st.session_state.reg_error = f"⚠️ {msg_clerk}"
+                                    st.rerun()
+
+                    # Registration Error Display
+                    if "reg_error" in st.session_state and st.session_state.reg_error:
+                        st.markdown(f"""
+                        <div style="background: #FDECEA; border: 1px solid #C0392B; color: #C0392B; border-radius: 8px; padding: 6px 10px; font-size: 11px; font-weight: 600; margin-top: 6px; margin-bottom: 8px;">
+                            ⚠️ {st.session_state.reg_error}
+                        </div>
+                        """, unsafe_allow_html=True)
+
+    # Small sandbox footer
     st.markdown("""
-    <div style="text-align: center; margin-top: 24px; font-size: 11px; font-weight: 600; color: #6B7280; letter-spacing: 0.05em;">
+    <div style="text-align: center; margin-top: 10px; font-size: 10.5px; font-weight: 600; color: #49769F; letter-spacing: 0.05em;">
         SANDBOX • NO REAL MONEY &bull; SQLITE BACKED
     </div>
     """, unsafe_allow_html=True)
